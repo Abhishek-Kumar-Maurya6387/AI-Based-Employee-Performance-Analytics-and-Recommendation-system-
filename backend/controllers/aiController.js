@@ -1,5 +1,22 @@
 const axios = require('axios');
 
+const DEFAULT_MODELS = [
+  'meta-llama/llama-3.2-3b-instruct:free',
+  'openrouter/free',
+  'deepseek/deepseek-v4-flash:free',
+  'google/gemma-4-26b-a4b-it:free',
+  'openai/gpt-oss-20b:free',
+];
+
+const getModelCandidates = () => {
+  const configuredModels = (process.env.OPENROUTER_MODEL || '')
+    .split(',')
+    .map((model) => model.trim())
+    .filter(Boolean);
+
+  return [...new Set([...configuredModels, ...DEFAULT_MODELS])];
+};
+
 const buildEmployeePrompt = (employees) => {
   const employeeList = employees.map((employee, index) => {
     const skills = Array.isArray(employee.skills) && employee.skills.length
@@ -33,23 +50,42 @@ const getRecommendation = async (req, res, next) => {
       return res.status(500).json({ message: 'OpenRouter API key is not configured' });
     }
 
-    const response = await axios.post(
-      'https://openrouter.ai/api/v1/chat/completions',
-      {
-        model: process.env.OPENROUTER_MODEL || 'mistralai/mistral-7b-instruct-v0.3',
-        messages: [{ role: 'user', content: buildEmployeePrompt(employees) }],
-        temperature: 0.3,
-      },
-      {
-        headers: {
-          Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
-          'Content-Type': 'application/json',
-          'HTTP-Referer': process.env.CLIENT_URL || 'http://localhost:5173',
-          'X-Title': 'Employee Analytics AI',
-        },
-        timeout: 30000,
+    const prompt = buildEmployeePrompt(employees);
+    const errors = [];
+    let response;
+
+    for (const model of getModelCandidates()) {
+      try {
+        response = await axios.post(
+          'https://openrouter.ai/api/v1/chat/completions',
+          {
+            model,
+            messages: [{ role: 'user', content: prompt }],
+            temperature: 0.3,
+          },
+          {
+            headers: {
+              Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
+              'Content-Type': 'application/json',
+              'HTTP-Referer': process.env.CLIENT_URL || 'http://localhost:5173',
+              'X-Title': 'Employee Analytics AI',
+            },
+            timeout: 15000,
+          }
+        );
+        break;
+      } catch (error) {
+        const message = error.response?.data?.error?.message || error.response?.data?.message || error.message;
+        errors.push(`${model}: ${message}`);
       }
-    );
+    }
+
+    if (!response) {
+      return res.status(502).json({
+        message: 'AI provider request failed for all configured models',
+        details: errors,
+      });
+    }
 
     const recommendation = response.data?.choices?.[0]?.message?.content;
 

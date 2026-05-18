@@ -24,9 +24,12 @@ const allowedOrigins = [
 const isLocalDevOrigin = (origin) =>
   /^http:\/\/(localhost|127\.0\.0\.1):\d+$/.test(origin);
 
+const isRenderOrigin = (origin) =>
+  /^https:\/\/[a-z0-9-]+\.onrender\.com$/i.test(origin);
+
 app.use(cors({
   origin(origin, callback) {
-    if (!origin || allowedOrigins.includes(origin) || isLocalDevOrigin(origin)) {
+    if (!origin || allowedOrigins.includes(origin) || isLocalDevOrigin(origin) || isRenderOrigin(origin)) {
       return callback(null, true);
     }
     return callback(new Error('Not allowed by CORS'));

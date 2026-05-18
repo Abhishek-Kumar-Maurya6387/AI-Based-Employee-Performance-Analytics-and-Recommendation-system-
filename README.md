@@ -131,7 +131,9 @@ Frontend Static Site:
 - Root Directory: `frontend`
 - Build Command: `npm install && npm run build`
 - Publish Directory: `dist`
-- Environment variable: `VITE_API_URL=https://your-backend.onrender.com/api`
+- Environment variable: `VITE_API_URL=https://your-backend.onrender.com`
+
+The frontend automatically adds `/api`, so both `https://your-backend.onrender.com` and `https://your-backend.onrender.com/api` work.
 
 ## Submission PDF Checklist
 
